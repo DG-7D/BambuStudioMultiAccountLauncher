@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "BambuStudioMultiAccountLauncher"
+name = "bambu_launcher"
 version = "0.1.0"
