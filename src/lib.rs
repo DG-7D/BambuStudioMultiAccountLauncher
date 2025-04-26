@@ -11,28 +11,27 @@ pub struct Config {
     filename: Option<String>,
 }
 impl Config {
-    pub fn new(args: &[String]) -> Result<Config, &'static str> {
+    pub fn new(mut args: impl Iterator<Item = String>) -> Result<Config, &'static str> {
+        args.next();
+
         let mut profile = None;
         let mut filename = None;
 
-        let mut iter = args.iter().skip(1);
-        while let Some(arg) = iter.next() {
+        while let Some(arg) = args.next() {
             if arg == "--profile" {
-                println!("{:?}", profile);
                 if profile.is_some() {
-                    return Err("'--profile' option is not allowed multiple times");
+                    return Err("'--profile' option is not allowed more than '1' time(s).");
                 }
-                profile = iter.next().cloned();
-                if profile.is_none() {
-                    return Err("Value expected for '--profile'");
-                }
-                continue;
-            }
-            if filename.is_none() {
-                filename = Some(arg.clone());
+                profile = match args.next() {
+                    Some(val) => Some(val),
+                    None => return Err("Value expected for '--profile'."),
+                };
                 continue;
             } else {
-                return Err("");
+                if filename.is_some() {
+                    return Err("Default option is not allowed more than '1' time(s).");
+                }
+                filename = Some(arg);
             }
         }
 
@@ -45,20 +44,28 @@ mod test {
     use super::*;
 
     #[test]
+    fn args_empty() {
+        let args = vec![String::from("test.exe")].into_iter();
+        let config = Config::new(args).unwrap();
+        assert_eq!(config.profile, None);
+        assert_eq!(config.filename, None);
+    }
+    #[test]
     fn args_only_profile() {
         let args = vec![
             String::from("test.exe"),
             String::from("--profile"),
             String::from("profile"),
-        ];
-        let config = Config::new(&args).unwrap();
+        ]
+        .into_iter();
+        let config = Config::new(args).unwrap();
         assert_eq!(config.profile, Some(String::from("profile")));
         assert_eq!(config.filename, None);
     }
     #[test]
     fn args_only_filename() {
-        let args = vec![String::from("test.exe"), String::from("filename.3mf")];
-        let config = Config::new(&args).unwrap();
+        let args = vec![String::from("test.exe"), String::from("filename.3mf")].into_iter();
+        let config = Config::new(args).unwrap();
         assert_eq!(config.profile, None);
         assert_eq!(config.filename, Some(String::from("filename.3mf")));
     }
@@ -69,19 +76,20 @@ mod test {
             String::from("--profile"),
             String::from("profile"),
             String::from("filename.3mf"),
-        ];
-        let config = Config::new(&args).unwrap();
+        ]
+        .into_iter();
+        let config = Config::new(args).unwrap();
         assert_eq!(config.profile, Some(String::from("profile")));
         assert_eq!(config.filename, Some(String::from("filename.3mf")));
     }
     #[test]
-    #[should_panic(expected = "Value expected for '--profile'")]
+    #[should_panic(expected = "Value expected for '--profile'.")]
     fn args_profile_without_value() {
-        let args = vec![String::from("test.exe"), String::from("--profile")];
-        Config::new(&args).unwrap();
+        let args = vec![String::from("test.exe"), String::from("--profile")].into_iter();
+        Config::new(args).unwrap();
     }
     #[test]
-    #[should_panic(expected = "'--profile' option is not allowed multiple times")]
+    #[should_panic(expected = "'--profile' option is not allowed more than '1' time(s).")]
     fn args_multiple_profile() {
         let args = vec![
             String::from("test.exe"),
@@ -89,17 +97,19 @@ mod test {
             String::from("profile1"),
             String::from("--profile"),
             String::from("profile2"),
-        ];
-        Config::new(&args).unwrap();
+        ]
+        .into_iter();
+        Config::new(args).unwrap();
     }
     #[test]
-    #[should_panic(expected = "")]
+    #[should_panic(expected = "Default option is not allowed more than '1' time(s).")]
     fn args_multiple_filename() {
         let args = vec![
             String::from("test.exe"),
             String::from("filename1.3mf"),
             String::from("filename2.3mf"),
-        ];
-        Config::new(&args).unwrap();
+        ]
+        .into_iter();
+        Config::new(args).unwrap();
     }
 }
