@@ -7,16 +7,17 @@ const SEPARATOR_CONF_PROFILE: &str = "_";
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     println!("Profile: {:?}", config.profile);
     println!("Ohters: {:?}", config.others);
-    println!("{:?}",    get_profile_list());
+    println!("{:?}", get_profile_list()?);
+    println!("{:?}", get_current_profile()?);
     return Ok(());
 }
 
 fn bambu_config_dir() -> std::path::PathBuf {
     return std::path::PathBuf::from(
-        &BAMBU_CONFIG_DIR.replace("%USERPROFILE%", &std::env::var("USERPROFILE").unwrap())
+        &BAMBU_CONFIG_DIR.replace("%USERPROFILE%", &std::env::var("USERPROFILE").unwrap()),
     );
 }
-    
+
 fn get_profile_list() -> Result<Vec<String>, std::io::Error> {
     let mut profile_list = Vec::<String>::new();
     let config_dir = bambu_config_dir();
@@ -26,11 +27,26 @@ fn get_profile_list() -> Result<Vec<String>, std::io::Error> {
         let file_name = file_name_osstr.to_str().unwrap();
         if entry.file_type()?.is_file() && file_name.starts_with(BAMBU_CONFIG_FILE) {
             if file_name[BAMBU_CONFIG_FILE.len()..].starts_with(SEPARATOR_CONF_PROFILE) {
-                profile_list.push(file_name[BAMBU_CONFIG_FILE.len() + SEPARATOR_CONF_PROFILE.len()..].to_string());
+                profile_list.push(
+                    file_name[BAMBU_CONFIG_FILE.len() + SEPARATOR_CONF_PROFILE.len()..].to_string(),
+                );
             }
         };
     }
     return Ok(profile_list);
+}
+
+fn get_current_profile() -> Result<String, std::io::Error> {
+    let config_dir = bambu_config_dir();
+    let current_config = std::fs::read(config_dir.join(BAMBU_CONFIG_FILE))?;
+    for profile in get_profile_list()? {
+        let file_name = BAMBU_CONFIG_FILE.to_string() + SEPARATOR_CONF_PROFILE + &profile;
+        let checking_config = std::fs::read(config_dir.join(file_name))?;
+        if checking_config == current_config {
+            return Ok(profile);
+        }
+    }
+    return Ok(String::from(""));
 }
 
 pub struct Config {
@@ -56,7 +72,6 @@ impl Config {
                 continue;
             } else {
                 others.push(arg);
-
             }
         }
 
