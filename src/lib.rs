@@ -7,8 +7,13 @@ const SEPARATOR_CONF_PROFILE: &str = "_";
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     println!("Profile: {:?}", config.profile);
     println!("Ohters: {:?}", config.others);
+    if config.profile.is_none() {
+        return Ok(());
+    }
     println!("{:?}", get_profile_list()?);
-    println!("{:?}", get_current_profile()?);
+    println!("Current: {:?}", get_current_profile()?);
+    set_profile(config.profile.unwrap())?;
+    println!("Current: {:?}", get_current_profile()?);
     return Ok(());
 }
 
@@ -40,13 +45,27 @@ fn get_current_profile() -> Result<String, std::io::Error> {
     let config_dir = bambu_config_dir();
     let current_config = std::fs::read(config_dir.join(BAMBU_CONFIG_FILE))?;
     for profile in get_profile_list()? {
-        let file_name = BAMBU_CONFIG_FILE.to_string() + SEPARATOR_CONF_PROFILE + &profile;
+        let file_name = format!("{}{}{}", BAMBU_CONFIG_FILE, SEPARATOR_CONF_PROFILE, profile);
         let checking_config = std::fs::read(config_dir.join(file_name))?;
         if checking_config == current_config {
             return Ok(profile);
         }
     }
     return Ok(String::from(""));
+}
+
+fn set_profile(profile_name: String) -> Result<(), std::io::Error> {
+    let config_dir = bambu_config_dir();
+    std::fs::remove_file(config_dir.join(BAMBU_CONFIG_FILE))?;
+    let file_name = format!(
+        "{}{}{}",
+        BAMBU_CONFIG_FILE, SEPARATOR_CONF_PROFILE, profile_name
+    );
+    std::fs::hard_link(
+        config_dir.join(file_name),
+        config_dir.join(BAMBU_CONFIG_FILE),
+    )?;
+    return Ok(());
 }
 
 pub struct Config {
