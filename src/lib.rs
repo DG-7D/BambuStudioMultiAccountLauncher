@@ -78,6 +78,7 @@ fn get_current_profile() -> Result<String, std::io::Error> {
 fn is_bambu_running() -> bool {
     let stdout = std::process::Command::new("tasklist")
         .args(["/fi", &format!("imagename eq {}", BAMBU_EXE_FILE)])
+        .stdout(std::process::Stdio::null())
         .output()
         .unwrap()
         .stdout;
@@ -94,6 +95,7 @@ fn kill_bambu() {
     }
     std::process::Command::new("taskkill")
         .args(["/im", BAMBU_EXE_FILE])
+        .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
     for _ in 0..TIMEOUT {
@@ -102,7 +104,10 @@ fn kill_bambu() {
             return;
         }
     }
-    println!("{} was not closed withn {} seconds.", BAMBU_EXE_FILE, TIMEOUT);
+    println!(
+        "{} was not closed withn {} seconds.",
+        BAMBU_EXE_FILE, TIMEOUT
+    );
     println!("");
     println!("Please choose one of the following options:");
     println!("m: Close mannually");
@@ -126,6 +131,7 @@ fn kill_bambu() {
                 println!("Killing {} forcefully.", BAMBU_EXE_FILE);
                 std::process::Command::new("taskkill")
                     .args(["/f", "/im", BAMBU_EXE_FILE])
+                    .stdout(std::process::Stdio::null())
                     .spawn()
                     .unwrap();
                 while is_bambu_running() {
@@ -146,11 +152,16 @@ fn set_profile(profile_name: String) -> Result<(), std::io::Error> {
     let current_profile_name = get_current_profile()?;
     if profile_name != current_profile_name {
         if is_bambu_running() {
-            println!("Bambu Studio is already running with different profile. Select one of the following options:");
-            println!("c: Close existing instance and restart with selected profile ({}).", profile_name);
+            println!(
+                "Bambu Studio is already running with different profile. Select one of the following options:"
+            );
+            println!(
+                "c: Close existing instance and restart with selected profile ({}).",
+                profile_name
+            );
             println!("k: Keep current profile ({}).", current_profile_name);
             println!("q: Cancel and exit.");
-    
+
             use getch_rs::Key;
             loop {
                 match getch() {
@@ -170,7 +181,7 @@ fn set_profile(profile_name: String) -> Result<(), std::io::Error> {
             }
         }
     }
-    
+
     let config_dir = bambu_config_dir();
     std::fs::remove_file(config_dir.join(BAMBU_CONFIG_FILE))?;
     let file_name = format!(
@@ -186,7 +197,10 @@ fn set_profile(profile_name: String) -> Result<(), std::io::Error> {
 
 fn start_bambu(args: Vec<String>) -> Result<(), std::io::Error> {
     let exe_dir = std::path::PathBuf::from(BAMBU_EXE_DIR);
-    std::process::Command::new(exe_dir.join(BAMBU_EXE_FILE)).args(args).spawn().unwrap();
+    std::process::Command::new(exe_dir.join(BAMBU_EXE_FILE))
+        .args(args)
+        .spawn()
+        .unwrap();
     return Ok(());
 }
 
