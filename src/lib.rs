@@ -7,11 +7,11 @@ const SEPARATOR_CONF_PROFILE: &str = "_";
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     println!("Profile: {:?}", config.profile);
     println!("Ohters: {:?}", config.others);
+    println!("Current: {:?}", get_current_profile()?);
     if config.profile.is_none() {
         return Ok(());
     }
     println!("{:?}", get_profile_list()?);
-    println!("Current: {:?}", get_current_profile()?);
     set_profile(config.profile.unwrap())?;
     println!("Current: {:?}", get_current_profile()?);
     return Ok(());
@@ -43,7 +43,16 @@ fn get_profile_list() -> Result<Vec<String>, std::io::Error> {
 
 fn get_current_profile() -> Result<String, std::io::Error> {
     let config_dir = bambu_config_dir();
-    let current_config = std::fs::read(config_dir.join(BAMBU_CONFIG_FILE))?;
+    let config_file = config_dir.join(BAMBU_CONFIG_FILE);
+    let current_config = match std::fs::read(&config_file) {
+        Ok(config) => config,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            println!("{} not found. Creating empty one.", &config_file.to_str().unwrap());
+            std::fs::File::create(&config_file)?;
+            return Ok(String::from(""));
+        }
+        Err(error) => return Err(error),
+    };
     for profile in get_profile_list()? {
         let file_name = format!("{}{}{}", BAMBU_CONFIG_FILE, SEPARATOR_CONF_PROFILE, profile);
         let checking_config = std::fs::read(config_dir.join(file_name))?;
