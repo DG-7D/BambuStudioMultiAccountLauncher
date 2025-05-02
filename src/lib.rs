@@ -2,22 +2,21 @@ use std::{error, io::Write};
 
 const BAMBU_CONFIG_DIR: &str = "%USERPROFILE%\\AppData\\Roaming\\BambuStudio";
 const BAMBU_CONFIG_FILE: &str = "BambuNetworkEngine.conf";
-const BAMBU_EXE: &str = "bambu-studio.exe";
 const SEPARATOR_CONF_PROFILE: &str = "_";
+const BAMBU_EXE_DIR: &str = "C:\\Program Files\\Bambu Studio";
+const BAMBU_EXE_FILE: &str = "bambu-studio.exe";
 
-pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
-    println!("Profile: {:?}", config.profile);
-    println!("Ohters: {:?}", config.others);
+pub fn run(mut config: Config) -> Result<(), Box<dyn error::Error>> {
     println!("Current: {:?}", get_current_profile()?);
+    println!("Selected: {:?}", config.profile);
+    println!("Args: {:?}", config.others);
 
-    if config.profile.is_some() {
-        kill_bambu();
-        set_profile(config.profile.unwrap())?;
-        println!("Current: {:?}", get_current_profile()?);
-        return Ok(());
+    if config.profile.is_none() {
+        println!("{:?}", get_profile_list()?);
+        config.profile = Some(String::from(""));
     }
-
-    println!("{:?}", get_profile_list()?);
+    set_profile(config.profile.unwrap())?;
+    start_bambu(config.others).unwrap();
     return Ok(());
 }
 
@@ -25,6 +24,12 @@ fn bambu_config_dir() -> std::path::PathBuf {
     return std::path::PathBuf::from(
         &BAMBU_CONFIG_DIR.replace("%USERPROFILE%", &std::env::var("USERPROFILE").unwrap()),
     );
+}
+
+fn getch() -> getch_rs::Key {
+    use getch_rs::Getch;
+    let g = Getch::new();
+    return g.getch().unwrap();
 }
 
 fn get_profile_list() -> Result<Vec<String>, std::io::Error> {
@@ -72,23 +77,23 @@ fn get_current_profile() -> Result<String, std::io::Error> {
 
 fn is_bambu_running() -> bool {
     let stdout = std::process::Command::new("tasklist")
-        .args(["/fi", &format!("imagename eq {}", BAMBU_EXE)])
+        .args(["/fi", &format!("imagename eq {}", BAMBU_EXE_FILE)])
         .output()
         .unwrap()
         .stdout;
     let stdout = String::from_utf8(stdout).unwrap();
-    return stdout.contains(BAMBU_EXE);
+    return stdout.contains(BAMBU_EXE_FILE);
 }
 
 fn kill_bambu() {
-    use getch_rs::{Getch, Key};
+    use getch_rs::Key;
     const TIMEOUT: u32 = 5;
 
     if !is_bambu_running() {
         return;
     }
     std::process::Command::new("taskkill")
-        .args(["/im", BAMBU_EXE])
+        .args(["/im", BAMBU_EXE_FILE])
         .spawn()
         .unwrap();
     for _ in 0..TIMEOUT {
@@ -97,7 +102,7 @@ fn kill_bambu() {
             return;
         }
     }
-    println!("{} was not closed withn {} seconds.", BAMBU_EXE, TIMEOUT);
+    println!("{} was not closed withn {} seconds.", BAMBU_EXE_FILE, TIMEOUT);
     println!("");
     println!("Please choose one of the following options:");
     println!("m: Close mannually");
@@ -105,15 +110,9 @@ fn kill_bambu() {
     println!("q: Cancel and exit");
 
     loop {
-        let key: Key;
-        // Getchを破棄するようにしないとCtrl+Cとかができなくなる
-        {
-            let g = Getch::new();
-            key = g.getch().unwrap();
-        }
-        match key {
+        match getch() {
             Key::Char('m') => {
-                print!("Wait for {} mannually closed .", BAMBU_EXE);
+                print!("Wait for {} mannually closed .", BAMBU_EXE_FILE);
                 std::io::stdout().flush().unwrap();
                 while is_bambu_running() {
                     std::thread::sleep(std::time::Duration::from_secs(1));
@@ -124,9 +123,9 @@ fn kill_bambu() {
                 return;
             }
             Key::Char('k') => {
-                println!("Killing {} forcefully.", BAMBU_EXE);
+                println!("Killing {} forcefully.", BAMBU_EXE_FILE);
                 std::process::Command::new("taskkill")
-                    .args(["/f", "/im", BAMBU_EXE])
+                    .args(["/f", "/im", BAMBU_EXE_FILE])
                     .spawn()
                     .unwrap();
                 while is_bambu_running() {
@@ -144,6 +143,34 @@ fn kill_bambu() {
 }
 
 fn set_profile(profile_name: String) -> Result<(), std::io::Error> {
+    let current_profile_name = get_current_profile()?;
+    if profile_name != current_profile_name {
+        if is_bambu_running() {
+            println!("Bambu Studio is already running with different profile. Select one of the following options:");
+            println!("c: Close existing instance and restart with selected profile ({}).", profile_name);
+            println!("k: Keep current profile ({}).", current_profile_name);
+            println!("q: Cancel and exit.");
+    
+            use getch_rs::Key;
+            loop {
+                match getch() {
+                    Key::Char('c') => {
+                        kill_bambu();
+                        break;
+                    }
+                    Key::Char('k') => {
+                        return Ok(());
+                    }
+                    Key::Char('q') => {
+                        println!("Cancelled.");
+                        std::process::exit(0);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    
     let config_dir = bambu_config_dir();
     std::fs::remove_file(config_dir.join(BAMBU_CONFIG_FILE))?;
     let file_name = format!(
@@ -154,6 +181,12 @@ fn set_profile(profile_name: String) -> Result<(), std::io::Error> {
         config_dir.join(file_name),
         config_dir.join(BAMBU_CONFIG_FILE),
     )?;
+    return Ok(());
+}
+
+fn start_bambu(args: Vec<String>) -> Result<(), std::io::Error> {
+    let exe_dir = std::path::PathBuf::from(BAMBU_EXE_DIR);
+    std::process::Command::new(exe_dir.join(BAMBU_EXE_FILE)).args(args).spawn().unwrap();
     return Ok(());
 }
 
