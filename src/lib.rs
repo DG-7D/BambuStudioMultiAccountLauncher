@@ -127,11 +127,9 @@ fn get_current_profile() -> Result<String, std::io::Error> {
     return Ok(String::from(""));
 }
 
-// FIXME: 機能してないぽい
 fn is_bambu_running() -> bool {
     let stdout = std::process::Command::new("tasklist")
         .args(["/fi", &format!("imagename eq {}", BAMBU_EXE_FILE)])
-        .stdout(std::process::Stdio::null())
         .output()
         .unwrap()
         .stdout;
@@ -146,6 +144,7 @@ fn kill_bambu() {
     if !is_bambu_running() {
         return;
     }
+    println!("Closing Bambu Studio.");
     std::process::Command::new("taskkill")
         .args(["/im", BAMBU_EXE_FILE])
         .stdout(std::process::Stdio::null())
@@ -157,11 +156,11 @@ fn kill_bambu() {
             return;
         }
     }
-    println!(
-        "{} was not closed withn {} seconds.",
-        BAMBU_EXE_FILE, TIMEOUT
-    );
     println!("");
+    println!(
+        "Bambu Studio was not closed within {} seconds. Bambu Studio may be asking for confirmation.",
+        TIMEOUT
+    );
     println!("Please choose one of the following options:");
     println!("m: Close mannually");
     println!("k: Kill forcefully");
@@ -279,6 +278,7 @@ fn set_profile(profile_name: String) -> Result<(), std::io::Error> {
 }
 
 fn start_bambu(args: Vec<String>) -> Result<(), std::io::Error> {
+    println!("Starting Bambu Studio.");
     let exe_dir = std::path::PathBuf::from(BAMBU_EXE_DIR);
     std::process::Command::new(exe_dir.join(BAMBU_EXE_FILE))
         .args(args)
