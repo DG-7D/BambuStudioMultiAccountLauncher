@@ -97,8 +97,15 @@ fn create_profile(profile_name: String) -> Result<(), std::io::Error> {
             format!("Profile `{}` already exists.", profile_name),
         ));
     }
-    std::fs::File::create(config_file)?;
-    println!("Profile `{}` created.", profile_name);
+
+    if get_current_profile()?.is_empty() {
+        std::fs::hard_link(config_dir.join(BAMBU_CONFIG_FILE), config_file)?;
+        println!("Current profile copied as profile `{}`.", profile_name);
+    } else {
+        std::fs::File::create(config_file)?;
+        println!("Profile `{}` created.", profile_name);
+    }
+
     return Ok(());
 }
 
