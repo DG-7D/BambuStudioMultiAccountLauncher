@@ -8,9 +8,19 @@ fn main() {
         eprintln!("ERROR: Invalid syntax. {}", err);
         process::exit(1);
     });
-    if let Err(e) = bambu_launcher::run(config) {
-        eprintln!("ERROR: {}", e);
-        process::exit(1);
-    };
+    loop {
+        match bambu_launcher::run(&config) {
+            Ok(true) => {
+                continue;      
+            }
+            Ok(false) => {
+                process::exit(0);
+            }
+            Err(e) => {
+                eprintln!("ERROR: {}", e);
+                process::exit(1);
+            }
+        }
+    }
 }
 
