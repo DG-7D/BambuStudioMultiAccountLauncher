@@ -1,5 +1,5 @@
 use getch_rs::Key;
-use std::{error, io::Write, thread::current};
+use std::{error, io::Write};
 
 const BAMBU_CONFIG_DIR: &str = "%USERPROFILE%\\AppData\\Roaming\\BambuStudio";
 const BAMBU_CONFIG_FILE: &str = "BambuNetworkEngine.conf";
@@ -12,13 +12,12 @@ pub fn run(config: &Config) -> Result<bool, Box<dyn error::Error>> {
     let config_others = config.others.clone();
 
     if config_profile.is_none() {
+        let profile_list = get_profile_list()?;
         println!("\nSelect a profile or one of other options:");
         println!("0: Current ({})", get_current_profile()?);
-        for (i, profile) in get_profile_list()?.iter().enumerate() {
-            println!("{}: {}", i + 1, profile);
-        }
+        print_profile_list(&profile_list);
         println!("n: Create a new profile");
-        println!("r: Remove a profile");
+        println!("d: Delete a profile");
         println!("q: Exit");
         loop {
             match getch() {
@@ -28,11 +27,10 @@ pub fn run(config: &Config) -> Result<bool, Box<dyn error::Error>> {
                 }
                 Key::Char(char @ '1'..'9') => {
                     let index = char.to_digit(10).unwrap() - 1;
-                    if index >= get_profile_list()?.len() as u32 {
+                    if index >= profile_list.len() as u32 {
                         continue;
                     }
-                    config_profile =
-                        Some(get_profile_list()?.get(index as usize).unwrap().to_string());
+                    config_profile = Some(profile_list.get(index as usize).unwrap().to_string());
                     break;
                 }
                 Key::Char('n') => {
@@ -40,9 +38,28 @@ pub fn run(config: &Config) -> Result<bool, Box<dyn error::Error>> {
                     std::io::stdout().flush().unwrap();
                     let mut profile_name = String::new();
                     std::io::stdin().read_line(&mut profile_name)?;
-                    create_profile(profile_name.trim().to_string())?;
+                    match create_profile(profile_name.trim().to_string()) {
+                        Ok(_) => {}
+                        Err(error) => {
+                            println!("Failed: {}", error);
+                        }
+                    };
                     return Ok(true);
                 }
+                Key::Char('d') => {
+                    print!("Enter the profile name to delete: ");
+                    std::io::stdout().flush().unwrap();
+                    let mut profile_name = String::new();
+                    std::io::stdin().read_line(&mut profile_name)?;
+                    match delete_profile(profile_name.trim().to_string()) {
+                        Ok(_) => {}
+                        Err(error) => {
+                            println!("Failed: {}", error);
+                        }
+                    };
+                    return Ok(true);
+                }
+
                 Key::Char('q') => {
                     return Ok(false);
                 }
@@ -75,6 +92,25 @@ fn create_profile(profile_name: String) -> Result<(), std::io::Error> {
         ));
     }
     std::fs::File::create(config_file)?;
+    println!("Profile `{}` created.", profile_name);
+    return Ok(());
+}
+
+fn delete_profile(profile_name: String) -> Result<(), std::io::Error> {
+    let config_dir = bambu_config_dir();
+    let file_name = format!(
+        "{}{}{}",
+        BAMBU_CONFIG_FILE, SEPARATOR_CONF_PROFILE, profile_name
+    );
+    let config_file = config_dir.join(file_name);
+    if !config_file.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Profile `{}` not found.", profile_name),
+        ));
+    }
+    std::fs::remove_file(config_file)?;
+    println!("Profile `{}` deleted.", profile_name);
     return Ok(());
 }
 
@@ -200,16 +236,22 @@ fn kill_bambu() {
     }
 }
 
+fn print_profile_list(profile_list: &Vec<String>) {
+    for (i, profile) in profile_list.iter().enumerate() {
+        println!("{}: {}", i + 1, profile);
+    }
+    return;
+}
+
 fn set_profile(profile_name: String) -> Result<(), std::io::Error> {
     let current_profile_name = get_current_profile()?;
-    println!("Current profile: {}", current_profile_name);
-    println!("Selected profile: {}", profile_name);
     if profile_name == current_profile_name {
+        println!("The selected profile `{}` is already set.", profile_name);
         return Ok(());
     }
 
     if current_profile_name == "" {
-        println!("`{}` is not linked with any profile.", BAMBU_CONFIG_FILE);
+        println!("\n`{}` is not linked with any profile.", BAMBU_CONFIG_FILE);
         println!("Select one of the following options:");
         println!("k: Keep current `{}`.", BAMBU_CONFIG_FILE);
         println!(
@@ -236,7 +278,7 @@ fn set_profile(profile_name: String) -> Result<(), std::io::Error> {
 
     if is_bambu_running() {
         println!(
-            "Bambu Studio is already running with different profile. Select one of the following options:"
+            "\nBambu Studio is already running with different profile. Select one of the following options:"
         );
         println!(
             "c: Close existing instance and restart with selected profile ({}).",
@@ -274,6 +316,7 @@ fn set_profile(profile_name: String) -> Result<(), std::io::Error> {
         config_dir.join(file_name),
         config_dir.join(BAMBU_CONFIG_FILE),
     )?;
+    println!("Profile `{}` set.", profile_name);
     return Ok(());
 }
 
