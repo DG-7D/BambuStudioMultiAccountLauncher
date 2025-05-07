@@ -79,6 +79,12 @@ fn bambu_config_dir() -> std::path::PathBuf {
 }
 
 fn create_profile(profile_name: String) -> Result<(), std::io::Error> {
+    if profile_name.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Profile name cannot be empty.",
+        ));
+    }
     let config_dir = bambu_config_dir();
     let file_name = format!(
         "{}{}{}",
@@ -97,6 +103,12 @@ fn create_profile(profile_name: String) -> Result<(), std::io::Error> {
 }
 
 fn delete_profile(profile_name: String) -> Result<(), std::io::Error> {
+    if profile_name.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Profile name cannot be empty.",
+        ));
+    }
     let config_dir = bambu_config_dir();
     let file_name = format!(
         "{}{}{}",
