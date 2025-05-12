@@ -14,14 +14,14 @@ pub fn run(config: &Config) -> Result<bool, Box<dyn error::Error>> {
     if config_profile.is_none() {
         let profile_list = get_profile_list()?;
         println!("\nSelect a profile or one of other options:");
-        println!("0: Current ({})", get_current_profile()?);
+        println!("Enter: Current ({})", get_current_profile()?);
         print_profile_list(&profile_list);
         println!("n: Create a new profile");
         println!("d: Delete a profile");
         println!("q: Exit");
         loop {
             match getch() {
-                Key::Char('0') => {
+                Key::Char('\r') => {
                     config_profile = Some(get_current_profile()?);
                     break;
                 }
